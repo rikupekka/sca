@@ -208,7 +208,7 @@ const fresh = () => ({
   airline:"", flightClass:"Economy", escortPrice:"", patientPrice:"", escorts:"1", escortType:"Registered Nurse",
   dateFrom:"", dateTo:"",
   // Hotel
-  hotelYes:"yes", hotelSide:"origin", nights:"1", nightRate:"",
+  hotelYes:"yes", hotelSide:"origin", nights:"1", rooms:"1", nightRate:"",
   pickupHospital:"", dropHospital:"", radiusKm:"3",
   // Costs
   transfersYes:"yes", numTransfers:"2", transferCost:"", adminFee:"",
@@ -415,7 +415,7 @@ export default function App() {
 
   // Costs
   const ft = ac ? (parseFloat(ac.escortPrice)||0)*parseInt(ac.escorts||1) + (parseFloat(ac.patientPrice)||0) : 0;
-  const ht = ac && ac.hotelYes === "yes" ? (parseFloat(ac.nightRate)||0) * (parseInt(ac.nights)||1) : 0;
+  const ht = ac && ac.hotelYes === "yes" ? (parseFloat(ac.nightRate)||0) * (parseInt(ac.nights)||1) * (parseInt(ac.rooms)||1) : 0;
   const tt = ac && ac.transfersYes === "yes" ? (parseFloat(ac.transferCost)||0) * (parseInt(ac.numTransfers)||1) : 0;
   const mt = ac ? parseFloat(ac.adminFee)||0 : 0;
   const grand = ft + ht + tt + mt;
@@ -444,7 +444,7 @@ export default function App() {
         ? `Selected hotel: ${selHotel.name} (${selHotel.distanceKm}km from hospital, ${selHotel.stars}★, AUD $${selHotel.rateAUD}/night)`
         : "";
       const text = await claude(
-        `You are an expert medical repatriation coordinator at Southern Cross Assist (SCA). Generate a professional repatriation cost quotation for a referring insurer.\n\nCase:\n${JSON.stringify(ac, null, 2)}\n${hotelNote}\n\nCalculated costs:\n- Flights: AUD $${ft.toFixed(2)} (${ac.escorts} escort × $${ac.escortPrice} + patient $${ac.patientPrice})\n- Hotel: AUD $${ht.toFixed(2)} (${ac.nights} nights × $${ac.nightRate}/night)\n- Transfers: AUD $${tt.toFixed(2)} (${ac.numTransfers} × $${ac.transferCost})\n- Medical/Admin: AUD $${mt.toFixed(2)}\n- GRAND TOTAL: AUD $${total.toFixed(2)}\n\nInclude:\n1) MEDICAL REPATRIATION QUOTATION header — date, case number, referring company\n2) Patient Summary\n3) Repatriation Plan with airline MEDA notes and route considerations\n4) Itemised Cost Table\n5) Inclusions & Exclusions\n6) MEDA Requirements\n7) Validity: 5 business days\n8) Authorisation section\n9) Southern Cross Assist contact footer\n\nProfessional insurer-facing tone.`
+        `You are an expert medical repatriation coordinator at Southern Cross Assist (SCA). Generate a professional repatriation cost quotation for a referring insurer.\n\nCase:\n${JSON.stringify(ac, null, 2)}\n${hotelNote}\n\nCalculated costs:\n- Flights: AUD $${ft.toFixed(2)} (${ac.escorts} escort × $${ac.escortPrice} + patient $${ac.patientPrice})\n- Hotel: AUD $${ht.toFixed(2)} (${ac.nights} nights × ${ac.rooms||1} room(s) × $${ac.nightRate}/night)\n- Transfers: AUD $${tt.toFixed(2)} (${ac.numTransfers} × $${ac.transferCost})\n- Medical/Admin: AUD $${mt.toFixed(2)}\n- GRAND TOTAL: AUD $${total.toFixed(2)}\n\nInclude:\n1) MEDICAL REPATRIATION QUOTATION header — date, case number, referring company\n2) Patient Summary\n3) Repatriation Plan with airline MEDA notes and route considerations\n4) Itemised Cost Table\n5) Inclusions & Exclusions\n6) MEDA Requirements\n7) Validity: 5 business days\n8) Authorisation section\n9) Southern Cross Assist contact footer\n\nProfessional insurer-facing tone.`
       );
       setQuote(text || "No content returned — please try again.");
     } catch (e) {
@@ -458,7 +458,7 @@ export default function App() {
     const hospital = (hotelSide === "origin" ? ac.pickupHospital : ac.dropHospital || "").trim();
     const city = hotelSide === "origin"
       ? `${ac.fromCity || ""} ${ac.fromCountry || ""}`.trim()
-      : `${ac.toCity || ""} ${ac.toState || ""} Australia`.trim();
+      : `${ac.toCity || ""} ${ac.toState || ""}`.trim();
 
     if (!hospital) {
       setHotelErr("Please enter a hospital name in the field below first.");
@@ -470,7 +470,7 @@ export default function App() {
     try {
       const radius = ac.radiusKm || 3;
       const text = await claude(
-        `Search the web for hotels near this hospital: "${hospital}", ${city}.\n\nFind up to 5 real, currently operating hotels within ${radius}km walking or driving distance.\n\nRespond with ONLY a JSON array — no explanation, no markdown, no code fences. The array must start with [ and end with ].\n\nRequired format:\n[\n  {\n    "name": "Hotel Name",\n    "distanceKm": 0.8,\n    "stars": 4,\n    "rateAUD": 180,\n    "suitability": "One sentence on why suitable for medical escort",\n    "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Hotel+Name+City"\n  }\n]\n\nSort by distance ascending. Only include hotels genuinely close to the hospital.`,
+        `Search the web for hotels near this hospital: "${hospital}", ${city}.\n\nWe need ${ac.rooms || 1} room(s) for medical escort(s). Find up to 5 real, currently operating hotels within ${radius}km walking or driving distance.\n\nRespond with ONLY a JSON array — no explanation, no markdown, no code fences. The array must start with [ and end with ].\n\nRequired format:\n[\n  {\n    "name": "Hotel Name",\n    "distanceKm": 0.8,\n    "stars": 4,\n    "rateAUD": 180,\n    "suitability": "One sentence on why suitable for medical escort",\n    "mapsUrl": "https://www.google.com/maps/search/?api=1&query=Hotel+Name+City"\n  }\n]\n\nSort by distance ascending. Only include hotels genuinely close to the hospital.`,
         true // enable web search
       );
 
@@ -702,7 +702,7 @@ export default function App() {
                 </div>
 
                 <div style={CARD}>
-                  <SH t="🏥 Drop Off — Australia" />
+                  <SH t="🏥 Drop Off" />
                   <G2>
                     <F label="Primary Physician"  val={ac.dropPhysician} onSave={sv("dropPhysician")} />
                     <F label="Medical Facility"   val={ac.dropFacility}  onSave={sv("dropFacility")} />
@@ -761,7 +761,7 @@ export default function App() {
                     <F label="Origin City"                 val={ac.fromCity}        onSave={sv("fromCity")} />
                     <F label="Origin Country"              val={ac.fromCountry}     onSave={sv("fromCountry")} />
                     <F label="Destination City"            val={ac.toCity}          onSave={sv("toCity")} />
-                    <F label="Destination State"           val={ac.toState}         onSave={sv("toState")} />
+                    <F label="Destination Country"         val={ac.toState}         onSave={sv("toState")} />
                     <F label="Earliest Travel Date"        val={ac.dateFrom}        onSave={sv("dateFrom")} type="date" />
                     <F label="Latest Travel Date"          val={ac.dateTo}          onSave={sv("dateTo")}   type="date" />
                   </G2>
@@ -801,8 +801,9 @@ export default function App() {
                         { v: "both",        l: "Both ends" },
                       ]} />
                       <F label="Nights" val={ac.nights}   onSave={sv("nights")}   type="number" />
+                      <F label="Rooms" val={ac.rooms} onSave={sv("rooms")} type="number" ph="1" />
                       <div>
-                        <F label="Cost Per Night (AUD)" val={ac.nightRate} onSave={sv("nightRate")} type="number" ph="180" />
+                        <F label="Cost Per Night Per Room (AUD)" val={ac.nightRate} onSave={sv("nightRate")} type="number" ph="180" />
                         {selHotel && <div style={{ fontSize: 11, color: C.navy, marginTop: 4, fontWeight: 600 }}>✓ {selHotel.name} selected</div>}
                       </div>
                       <FULL>
@@ -810,7 +811,7 @@ export default function App() {
                       </FULL>
                     </>}
                   </G2>
-                  {ht > 0 && <div style={{ marginTop: 10, fontSize: 12, color: C.navy, fontWeight: 600 }}>Hotel subtotal: AUD ${fmt(ht)}</div>}
+                  {ht > 0 && <div style={{ marginTop: 10, fontSize: 12, color: C.navy, fontWeight: 600 }}>Hotel subtotal: AUD ${fmt(ht)} ({ac.rooms||1} room(s) × {ac.nights} nights × AUD ${ac.nightRate}/night)</div>}
                 </div>
 
                 <div style={CARD}>
@@ -883,6 +884,12 @@ export default function App() {
                         : "e.g. Austin Hospital, Heidelberg, Victoria, Australia"}
                       style={INP}
                     />
+                  </div>
+                  <div style={{ marginTop: 14, marginBottom: 14 }}>
+                    <label style={LBL}>Number of Rooms Required</label>
+                    <select value={ac.rooms || "1"} onChange={e => sv("rooms")(e.target.value)} style={INP}>
+                      {["1","2","3","4"].map(v => <option key={v} value={v}>{v} room{v>"1"?"s":""}</option>)}
+                    </select>
                   </div>
                   <PrimaryBtn onClick={findHotels} disabled={hotelBusy}>{hotelBusy ? "Searching..." : `Search Hotels within ${ac.radiusKm || 3}km`}</PrimaryBtn>
                 </div>
